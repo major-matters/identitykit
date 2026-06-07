@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "identitykit"
+version = "0.0.1"
+description = "Portable, signed, resolvable agent identity plus the cross-walk onto DID, FIDO, AP2, and EUDI. v0."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Major Labs" }]
+keywords = ["ai-agents", "identity", "did", "did-key", "did-web", "verifiable-credentials", "ap2", "ed25519"]
+# Vetted, constant-time Ed25519 (cryptography) and RFC 8785 canonicalization
+# (rfc8785). Pure-Python fallbacks exist if these are absent (see signing.py /
+# canonical.py), so the package still runs with zero deps for experimentation.
+dependencies = [
+  "cryptography>=42",
+  "rfc8785>=0.1.2",
+]
+
+[project.optional-dependencies]
+# Property-based test suite + static security scan.
+test = ["hypothesis>=6", "bandit>=1.7"]
+
+[project.urls]
+Homepage = "https://majorlabs.co"
+Source = "https://github.com/major-matters/identitykit"
+
+[tool.setuptools]
+packages = ["identitykit"]
+
+[tool.setuptools.package-data]
+identitykit = ["py.typed"]

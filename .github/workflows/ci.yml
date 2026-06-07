@@ -1,0 +1,76 @@
+# CI for IdentityKit. Lives under identitykit/ so it sits at the repo root once
+# the package is extracted into its own public repository.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install deps (vetted crypto + JCS + test/lint tools)
+        working-directory: python
+        run: pip install cryptography rfc8785 hypothesis bandit
+      - name: Unit tests
+        working-directory: python
+        run: PYTHONPATH=. python tests/test_identitykit.py
+      - name: Property tests (Hypothesis)
+        working-directory: python
+        run: PYTHONPATH=. python tests/test_properties.py
+      - name: Bandit (security lint)
+        working-directory: python
+        run: bandit -r identitykit -ll
+
+  python-fallback:
+    name: Python (dependency-free fallback)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests with NO optional deps (pure-Python Ed25519 + sorted-JSON fallback)
+        working-directory: python
+        run: PYTHONPATH=. python tests/test_identitykit.py
+
+  typescript:
+    name: TypeScript (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        working-directory: typescript
+        run: npm install --no-audit --no-fund
+      - name: Build (type-check + emit dist + types)
+        working-directory: typescript
+        run: npm run build
+      - name: Tests (unit + property)
+        working-directory: typescript
+        run: npm test
+
+  semgrep:
+    name: Semgrep (SAST)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep scan
+        run: semgrep scan --config p/python --config p/typescript --config p/secrets --error
