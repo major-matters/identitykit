@@ -34,3 +34,11 @@ These are covered by unit tests (forgery, tamper, id-mismatch, SSRF, length-cap)
 ## Reporting
 
 v0 research artifact. Open an issue at [github.com/major-matters](https://github.com/major-matters) for anything that looks like a fail-open.
+
+## Audit status (v0)
+
+This is a v0 release. It has been independently hardened — CodeQL, bandit, semgrep, property-based tests, and adversarial tier 1-2 reviews, all passing in CI — but it has **not** had a third-party security audit. Treat it accordingly for anything high-stakes.
+
+## Security review welcome
+
+We actively want researcher eyes on this. If you find a fail-open, a signature bypass, an SSRF path, or any way to defeat a guarantee in this document, please open an issue. Credit given. The shared crypto core (Ed25519 + RFC 8785 canonicalization) and the did:web SSRF guard are the highest-value targets.
