@@ -42,3 +42,9 @@ This is a v0 release. It has been independently hardened — CodeQL, bandit, sem
 ## Security review welcome
 
 We actively want researcher eyes on this. If you find a fail-open, a signature bypass, an SSRF path, or any way to defeat a guarantee in this document, please open an issue. Credit given. The shared crypto core (Ed25519 + RFC 8785 canonicalization) and the did:web SSRF guard are the highest-value targets.
+
+## v0.0.2 hardening (2026-06-10 internal audit)
+
+- **did:web SSRF guard rewritten.** The previous guard only recognized dotted-decimal IPv4; alternate encodings (decimal `2130706433`, octal, hex, IPv4-mapped IPv6, NAT64) that `getaddrinfo` still resolves to internal hosts now get normalized and blocked, including the cloud metadata address `169.254.169.254`. The guard is also re-applied on every HTTP redirect hop; the TS fetch now has a timeout and a streamed response-size cap; `..`/empty did:web path segments are rejected.
+- **did:web key control (known limit).** A fetched did:web document still validates against its own embedded keys. The HTTPS fetch + host guard are the authenticity anchor; for high-stakes use, pin the controlling key out of band rather than trusting the document as its own root of trust.
+- **Canonicalization fallback.** The dependency-free fallback now fails closed (rejects floats and out-of-safe-range integers) instead of emitting bytes that diverge from RFC 8785. `rfc8785` (a declared dependency) remains the primary path; "byte-identical across Python and TypeScript" holds on that path.

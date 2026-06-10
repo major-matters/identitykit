@@ -1,6 +1,6 @@
 {
   "name": "identitykit",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Portable, signed, resolvable agent identity plus the cross-walk onto DID, FIDO, AP2, and EUDI. v0.",
   "type": "module",
   "license": "MIT",
