@@ -6,7 +6,7 @@ As AI agents start to spend money and call APIs on someone's behalf, every count
 
 It is the **"who"** beneath the rest of the [Major Labs](https://majorlabs.co) agent-safety family:
 
-> **IdentityKit** says who the agent is. **MandateKit** says what it may do. **BudgetGuard** caps what it spends. **WitnessKit** proves what it did.
+> **[IdentityKit](https://github.com/major-matters/identitykit)** says who the agent is. **[MandateKit](https://github.com/major-matters/mandatekit)** says what it may do. **[BudgetGuard](https://github.com/major-matters/budget-guard)** caps what it spends. **[WitnessKit](https://github.com/major-matters/witnesskit)** proves what it did. **[RememberKit](https://github.com/major-matters/rememberkit)** governs what it remembers.
 
 MandateKit and WitnessKit already pin to raw public keys; IdentityKit makes those keys resolvable, attributable, and reputation-bearing.
 
@@ -89,6 +89,16 @@ Reputation is where identity systems die: sybil attacks, gaming, "who attests th
 - **Two methods only.** `did:key` and `did:web`. No ledger-backed methods, by choice (no blockchain).
 
 ---
+
+---
+
+## The accountability stack, September 2026
+
+This year's frontier launches arrived alongside rogue-agent incidents that investigators struggled to attribute, and a written admission from inside the labs that runtime monitoring is degrading. The accountability primitives those events call for are what this suite implements:
+
+> **[IdentityKit](https://github.com/major-matters/identitykit)** says who the agent is. **[MandateKit](https://github.com/major-matters/mandatekit)** says what it may do. **[BudgetGuard](https://github.com/major-matters/budget-guard)** caps what it spends. **[WitnessKit](https://github.com/major-matters/witnesskit)** proves what it did. **[RememberKit](https://github.com/major-matters/rememberkit)** governs what it remembers.
+
+The [MM Control Stack Compact](https://www.majormatters.co/p/open-letter-control-stack-compact) (September 2026) proposes six verifiable commitments for frontier-AI accountability. Attributable agents and contractually bounded authority need running code, not pledges. This suite is a working v0 of that layer.
 
 ## License
 
