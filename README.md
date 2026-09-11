@@ -1,5 +1,7 @@
 # IdentityKit
 
+[![MCP Surface Check: low surface](https://img.shields.io/badge/MCP_Surface_Check-low-4FA86A)](https://majorlabs.co/security)
+
 **Portable, signed, resolvable agent identity, plus the cross-walk onto the standards that will carry it.** Deterministic, fail-closed, off-the-shelf crypto. v0.
 
 As AI agents start to spend money and call APIs on someone's behalf, every counterparty asks the same question networks have always asked of parties: **who is this, who stands behind it, and what is its track record?** Today each platform answers that for itself, so a "verified" agent is a stranger everywhere else. IdentityKit is a portable answer.
