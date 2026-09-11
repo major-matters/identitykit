@@ -146,7 +146,7 @@ async function httpFetch(url: string, redirectsLeft = MAX_REDIRECTS): Promise<un
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetch(url, { // surfacecheck: ignore — SSRF-guarded: hostIsBlocked() rejects private/loopback above; redirect:"manual" + timeout
       headers: { Accept: "application/json", "User-Agent": "identitykit/0.0.2" },
       redirect: "manual",
       signal: controller.signal,
