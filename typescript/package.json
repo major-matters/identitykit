@@ -1,6 +1,6 @@
 {
   "name": "identitykit",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Portable, signed, resolvable agent identity plus the cross-walk onto DID, FIDO, AP2, and EUDI. v0.",
   "type": "module",
   "license": "MIT",
@@ -35,10 +35,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
-    "test": "node --test test/*.test.ts",
-    "test:build": "npm run build && node --test test/*.test.ts",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test:build": "npm run build && node --experimental-strip-types --test test/*.test.ts",
     "prepublishOnly": "npm run clean && npm run build",
-    "demo": "node demo.ts"
+    "demo": "node --experimental-strip-types demo.ts"
   },
   "devDependencies": {
     "@types/node": "^22",

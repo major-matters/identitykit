@@ -30,6 +30,11 @@ pip install identitykit          # Python 3.8+ (install 'cryptography' for const
 npm install identitykit          # Node 22.6+
 ```
 
+Node 22.6 or later. Type stripping is on by default from Node 22.18; on 22.6
+to 22.17 the repository's `npm test` and `npm run demo` pass
+`--experimental-strip-types` for you. The published package is compiled and
+needs no flag.
+
 The Python core runs with zero third-party deps via a pure-Python Ed25519 fallback; install `cryptography` for production. The TS core uses Node's built-in Ed25519 and one small dependency (`canonicalize`) for RFC 8785.
 
 ---
