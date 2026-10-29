@@ -31,3 +31,20 @@ test("did:web path traversal is rejected", () => {
     assert.throws(() => didWebUrl(did), `not rejected: ${did}`);
   }
 });
+
+// 2026-10-29: did:web host handling. Every %3A becomes ":" (not only the first), and the host must be
+// a plain name or IP literal with an optional numeric port; anything else is rejected before a URL is built.
+test("didWebUrl decodes a %3A port and rejects hosts that are not plain host[:port]", () => {
+  assert.equal(didWebUrl("did:web:example.com%3A8443"), "https://example.com:8443/.well-known/agent-identity.json");
+  assert.equal(didWebUrl("did:web:example.com%3a8443:agents:alpha"), "https://example.com:8443/agents/alpha/agent-identity.json");
+  for (const bad of [
+    "did:web:example.com%3A8443%3A9000", // two ports after full replacement
+    "did:web:example.com%2Fadmin", // percent-encoded slash
+    "did:web:user@example.com", // userinfo
+    "did:web:example.com?x=1", // query
+    "did:web:example.com#frag", // fragment
+    "did:web:", // empty host
+  ]) {
+    assert.throws(() => didWebUrl(bad), `not rejected: ${bad}`);
+  }
+});

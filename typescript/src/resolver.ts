@@ -18,7 +18,12 @@ export function didWebUrl(id: string): string {
   if (parts.length < 3 || parts[0] !== "did" || parts[1] !== "web") {
     throw new ResolutionError(`not a did:web identifier: ${id}`);
   }
-  const domain = parts[2].replace("%3A", ":");
+  // did:web encodes a port as %3A. Replace every occurrence (not just the first) and then
+  // accept only a plain host with an optional numeric port, so nothing else can reach the URL.
+  const domain = parts[2].replace(/%3a/gi, ":");
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,252}[A-Za-z0-9])?(?::\d{1,5})?$/.test(domain)) {
+    throw new ResolutionError(`did:web has an invalid host: ${id}`);
+  }
   const segments = parts.slice(3);
   // Reject path-traversal / empty segments so a DID cannot escape its own path.
   if (segments.some((s) => s === "" || s === "." || s === "..")) {
