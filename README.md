@@ -28,11 +28,11 @@ MandateKit and WitnessKit already pin to raw public keys; IdentityKit makes thos
 ## Install
 
 ```bash
-pip install identitykit          # Python 3.8+ (install 'cryptography' for constant-time Ed25519)
+pip install identitykit          # Python 3.8+ (pulls in cryptography and rfc8785)
 npm install identitykit          # Node 22.6+
 ```
 
-The Python core runs with zero third-party deps via a pure-Python Ed25519 fallback; install `cryptography` for production. The TS core uses Node's built-in Ed25519 and one small dependency (`canonicalize`) for RFC 8785.
+The Python package depends on `cryptography` (constant-time Ed25519) and `rfc8785` (RFC 8785 canonicalization); both install with it. Pure-Python fallbacks exist only for running from a checkout without them, and they are not constant-time. The TS core uses Node's built-in Ed25519 and one small dependency (`canonicalize`) for RFC 8785.
 
 ---
 

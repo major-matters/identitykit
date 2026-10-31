@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { hostIsBlocked, didWebUrl } from "../src/resolver.ts";
+import { hostIsBlocked, didWebUrl, httpFetch } from "../src/resolver.ts";
 
 const BLOCKED = [
   "127.0.0.1", "2130706433", "0x7f.0.0.1", "0177.0.0.1", "127.1",
@@ -46,5 +46,55 @@ test("didWebUrl decodes a %3A port and rejects hosts that are not plain host[:po
     "did:web:", // empty host
   ]) {
     assert.throws(() => didWebUrl(bad), `not rejected: ${bad}`);
+  }
+});
+
+// 2026-10-31 (audit M1): one deadline covers the whole response. Before, the timer was cleared
+// when the headers arrived, so a server that sent headers and then dripped the body forever held
+// the resolver open. The stub fetch below returns a stream that never closes.
+function stubFetch(makeBody: (controller: ReadableStreamDefaultController<Uint8Array>, signal: AbortSignal) => void) {
+  return (async (_url: string, init: { signal: AbortSignal }) => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        makeBody(controller, init.signal);
+      },
+    });
+    return new Response(stream, { status: 200, headers: { "content-type": "application/json" } });
+  }) as unknown as typeof fetch;
+}
+
+test("httpFetch applies one deadline to headers and body together (never-ending stream)", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stubFetch((controller, signal) => {
+    controller.enqueue(new TextEncoder().encode("{"));
+    signal.addEventListener("abort", () => controller.error(signal.reason ?? new Error("aborted")));
+    // and never closes
+  });
+  try {
+    const t0 = Date.now();
+    await assert.rejects(
+      () => httpFetch("https://example.com/.well-known/agent-identity.json", { timeoutMs: 200 }),
+      /time budget/,
+    );
+    assert.ok(Date.now() - t0 < 5_000, "deadline not honored");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("httpFetch refuses a body that crosses the 1 MB cap while streaming", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stubFetch((controller) => {
+    const chunk = new Uint8Array(256 * 1024).fill(0x20);
+    for (let i = 0; i < 5; i++) controller.enqueue(chunk); // 1.25 MB
+    controller.close();
+  });
+  try {
+    await assert.rejects(
+      () => httpFetch("https://example.com/.well-known/agent-identity.json", { timeoutMs: 5_000 }),
+      /size limit/,
+    );
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });

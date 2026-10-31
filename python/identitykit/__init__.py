@@ -26,7 +26,7 @@ from .signing import (
     public_from_seed,
 )
 
-__version__ = "0.0.1"
+from ._version import __version__  # noqa: E402  (kept in sync with pyproject.toml)
 
 __all__ = [
     "build_identity",

@@ -4,14 +4,16 @@
 import * as signing from "./signing.ts";
 import { InvalidIdentity, ResolutionError, UnsupportedMethod } from "./errors.ts";
 import { type AgentIdentity, verifyIdentity } from "./identity.ts";
+import { VERSION } from "./version.ts";
 
 export const WELL_KNOWN = ".well-known/agent-identity.json";
 const MAX_BYTES = 1_000_000;
 
 export type Fetcher = (url: string) => Promise<unknown> | unknown;
 
-const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_TIMEOUT_MS = 15_000; // one budget for the whole exchange: connect, headers and body
 const MAX_REDIRECTS = 3;
+const USER_AGENT = `identitykit/${VERSION}`;
 
 export function didWebUrl(id: string): string {
   const parts = id.split(":");
@@ -141,51 +143,63 @@ export function hostIsBlocked(host: string): boolean {
   return false; // a hostname; not resolved here
 }
 
-async function httpFetch(url: string, redirectsLeft = MAX_REDIRECTS): Promise<unknown> {
+/** Fetch a did:web document over HTTPS behind the SSRF guard. One deadline (`timeoutMs`)
+ *  covers connect, headers and the whole body read, so a server that drips bytes slowly
+ *  cannot hold the resolver open; the body is also capped at MAX_BYTES while streaming. */
+export async function httpFetch(
+  url: string,
+  opts: { redirectsLeft?: number; timeoutMs?: number } = {},
+): Promise<unknown> {
+  const redirectsLeft = opts.redirectsLeft ?? MAX_REDIRECTS;
+  const timeoutMs = opts.timeoutMs ?? FETCH_TIMEOUT_MS;
   if (!url.startsWith("https://")) throw new ResolutionError("did:web resolution requires HTTPS");
   const host = new URL(url).hostname;
   if (hostIsBlocked(host)) {
     throw new ResolutionError(`refusing to resolve a private/loopback host: ${host}`);
   }
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  let res: Response;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    res = await fetch(url, { // surfacecheck: ignore — SSRF-guarded: hostIsBlocked() rejects private/loopback above; redirect:"manual" + timeout
-      headers: { Accept: "application/json", "User-Agent": "identitykit/0.0.2" },
+    const res = await fetch(url, { // surfacecheck: ignore — SSRF-guarded: hostIsBlocked() rejects private/loopback above; redirect:"manual" + timeout
+      headers: { Accept: "application/json", "User-Agent": USER_AGENT },
       redirect: "manual",
       signal: controller.signal,
     });
+    // Re-check the SSRF guard on every redirect hop rather than following blindly.
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) throw new ResolutionError("did:web redirect without a Location header");
+      if (redirectsLeft <= 0) throw new ResolutionError("did:web exceeded redirect limit");
+      clearTimeout(timer); // the next hop runs under its own deadline
+      return httpFetch(new URL(loc, url).toString(), { redirectsLeft: redirectsLeft - 1, timeoutMs });
+    }
+    if (!res.ok) throw new ResolutionError(`fetch failed: HTTP ${res.status}`);
+    // Stream with a hard byte cap so a huge body cannot exhaust memory. The timer above is
+    // still armed here: aborting the signal errors the stream and ends this loop.
+    const reader = res.body?.getReader();
+    if (!reader) throw new ResolutionError("did:web response has no body");
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.length;
+        if (total > MAX_BYTES) {
+          await reader.cancel();
+          throw new ResolutionError("identity document exceeds size limit");
+        }
+        chunks.push(value);
+      }
+    }
+    const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
+    return JSON.parse(buf.toString("utf8"));
+  } catch (e) {
+    if (controller.signal.aborted) throw new ResolutionError(`did:web fetch exceeded its ${timeoutMs} ms time budget`);
+    throw e;
   } finally {
     clearTimeout(timer);
   }
-  // Re-check the SSRF guard on every redirect hop rather than following blindly.
-  if (res.status >= 300 && res.status < 400) {
-    const loc = res.headers.get("location");
-    if (!loc) throw new ResolutionError("did:web redirect without a Location header");
-    if (redirectsLeft <= 0) throw new ResolutionError("did:web exceeded redirect limit");
-    return httpFetch(new URL(loc, url).toString(), redirectsLeft - 1);
-  }
-  if (!res.ok) throw new ResolutionError(`fetch failed: HTTP ${res.status}`);
-  // Stream with a hard byte cap so a huge/slow body cannot exhaust memory.
-  const reader = res.body?.getReader();
-  if (!reader) throw new ResolutionError("did:web response has no body");
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      total += value.length;
-      if (total > MAX_BYTES) {
-        await reader.cancel();
-        throw new ResolutionError("identity document exceeds size limit");
-      }
-      chunks.push(value);
-    }
-  }
-  const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-  return JSON.parse(buf.toString("utf8"));
 }
 
 export interface DidKeyResolution {

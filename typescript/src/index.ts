@@ -33,4 +33,4 @@ export {
 } from "./reputation.ts";
 export * as crosswalk from "./crosswalk.ts";
 
-export const VERSION = "0.0.3";
+export { VERSION } from "./version.ts";

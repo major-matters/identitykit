@@ -31,9 +31,18 @@ These are covered by unit tests (forgery, tamper, id-mismatch, SSRF, length-cap)
 - No key rotation or revocation in v0.
 - DNS-based SSRF is out of scope for the default guard.
 
-## Reporting
+## Reporting a vulnerability
 
-v0 research artifact. Open an issue at [github.com/major-matters](https://github.com/major-matters) for anything that looks like a fail-open.
+Please report vulnerabilities privately via GitHub's private vulnerability
+reporting on this repository (Security tab -> Report a vulnerability). It is
+enabled and monitored.
+
+We follow the same standard we ask of others: acknowledgment within 7 days, a
+fix or a plan within 45, and credit to reporters who want it. Our coordinated
+disclosure process for the wider MCP ecosystem is described at
+https://majorlabs.co/security.
+
+Please do not open public issues for security reports.
 
 ## Audit status (v0)
 
@@ -41,7 +50,7 @@ This is a v0 release. It has been independently hardened — CodeQL, bandit, sem
 
 ## Security review welcome
 
-We actively want researcher eyes on this. If you find a fail-open, a signature bypass, an SSRF path, or any way to defeat a guarantee in this document, please open an issue. Credit given. The shared crypto core (Ed25519 + RFC 8785 canonicalization) and the did:web SSRF guard are the highest-value targets.
+We actively want researcher eyes on this. If you find a fail-open, a signature bypass, an SSRF path, or any way to defeat a guarantee in this document, please report it privately (see above). Credit given. The shared crypto core (Ed25519 + RFC 8785 canonicalization) and the did:web SSRF guard are the highest-value targets.
 
 ## v0.0.2 hardening (2026-06-10 internal audit)
 

@@ -10,16 +10,28 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import re
+import socket
+import time
 import urllib.parse
 import urllib.request
 from typing import Callable, Dict, Optional
 
 from . import signing
+from ._version import __version__
 from .errors import InvalidIdentity, ResolutionError, UnsupportedMethod
 from .identity import verify_identity
 
 WELL_KNOWN = ".well-known/agent-identity.json"
 _MAX_BYTES = 1_000_000  # refuse oversized documents
+_FETCH_TIMEOUT_S = 15.0  # one budget for the whole exchange: connect, headers and body
+_CHUNK_BYTES = 64 * 1024
+_USER_AGENT = f"identitykit/{__version__}"
+
+# A did:web host is a plain name or IP literal with an optional numeric port: nothing
+# else (userinfo, a query, a fragment, a percent-encoded slash) may reach the URL.
+# Same pattern as the TypeScript resolver.
+_HOST_RE = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,252}[A-Za-z0-9])?(?::\d{1,5})?")
 
 Fetcher = Callable[[str], Dict]
 
@@ -29,7 +41,11 @@ def did_web_url(id: str) -> str:
     parts = id.split(":")
     if len(parts) < 3 or parts[0] != "did" or parts[1] != "web":
         raise ResolutionError(f"not a did:web identifier: {id!r}")
-    domain = parts[2].replace("%3A", ":")  # encoded port, if any
+    # did:web encodes a port as %3A. Replace every occurrence (any case, not just the
+    # first) and then accept only host[:port], so nothing else can steer the fetch.
+    domain = re.sub(r"%3a", ":", parts[2], flags=re.IGNORECASE)
+    if not _HOST_RE.fullmatch(domain):
+        raise ResolutionError(f"did:web has an invalid host: {id!r}")
     segments = parts[3:]
     # Reject path-traversal / empty segments so a DID cannot escape its own path.
     if any(s in ("", ".", "..") for s in segments):
@@ -125,18 +141,51 @@ class _GuardedRedirectHandler(urllib.request.HTTPRedirectHandler):
 _opener = urllib.request.build_opener(_GuardedRedirectHandler())
 
 
+def _bound_next_read(resp, seconds: float) -> None:
+    """Best effort: shrink the socket timeout to what is left of the budget, so a single
+    read cannot outlive the deadline. Transports that are not socket-backed keep the
+    opener's per-read timeout."""
+    try:
+        resp.fp.raw._sock.settimeout(max(seconds, 0.001))
+    except Exception:  # nosec B110 - not a socket-backed response; the per-read timeout still applies
+        pass
+
+
+def _read_body(resp, deadline: float) -> bytes:
+    """Read a response body in chunks under one overall deadline (time.monotonic) and the
+    1 MB cap. A server that drips bytes slowly cannot hold the resolver past the budget,
+    and a huge body is refused as soon as it crosses the cap, not after it is in memory."""
+    chunks = []
+    total = 0
+    read1 = getattr(resp, "read1", None)  # at most one underlying read per call
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ResolutionError("did:web fetch exceeded its time budget")
+        _bound_next_read(resp, remaining)
+        try:
+            chunk = read1(_CHUNK_BYTES) if read1 is not None else resp.read(_CHUNK_BYTES)
+        except (socket.timeout, TimeoutError):
+            raise ResolutionError("did:web fetch exceeded its time budget")
+        if not chunk:
+            return b"".join(chunks)
+        total += len(chunk)
+        if total > _MAX_BYTES:
+            raise ResolutionError("identity document exceeds size limit")
+        chunks.append(chunk)
+
+
 def _http_fetch(url: str) -> Dict:
     if not url.startswith("https://"):
         raise ResolutionError("did:web resolution requires HTTPS")
     host = urllib.parse.urlparse(url).hostname or ""
     if _host_is_blocked(host):
         raise ResolutionError(f"refusing to resolve a private/loopback host: {host!r}")
-    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "identitykit/0.0.2"})
+    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": _USER_AGENT})
+    deadline = time.monotonic() + _FETCH_TIMEOUT_S
     # https enforced above; redirects re-checked by _GuardedRedirectHandler.
-    with _opener.open(req, timeout=15) as resp:  # nosec B310 # noqa: S310
-        raw = resp.read(_MAX_BYTES + 1)
-    if len(raw) > _MAX_BYTES:
-        raise ResolutionError("identity document exceeds size limit")
+    with _opener.open(req, timeout=_FETCH_TIMEOUT_S) as resp:  # nosec B310 # noqa: S310
+        raw = _read_body(resp, deadline)
     return json.loads(raw.decode("utf-8"))
 
 

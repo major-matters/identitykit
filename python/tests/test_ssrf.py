@@ -46,8 +46,33 @@ def test_path_traversal_rejected():
             pass
 
 
+# 2026-10-31: did:web host handling, ported from the TypeScript resolver. Every %3A becomes ":"
+# (any case, not only the first), and the host must be a plain name or IP literal with an optional
+# numeric port; anything else is rejected before a URL is built.
+def test_did_web_url_decodes_a_port_and_rejects_hosts_that_are_not_plain_host_port():
+    assert did_web_url("did:web:example.com%3A8443") == "https://example.com:8443/.well-known/agent-identity.json"
+    assert did_web_url("did:web:example.com%3a8443") == "https://example.com:8443/.well-known/agent-identity.json"
+    assert did_web_url("did:web:example.com%3a8443:agents:alpha") == "https://example.com:8443/agents/alpha/agent-identity.json"
+    for bad in [
+        "did:web:example.com%3A8443%3A9000",  # two ports after full replacement
+        "did:web:example.com%2Fadmin",  # percent-encoded slash
+        "did:web:a%2Fb.example.com",  # percent-encoded slash inside the host
+        "did:web:user@example.com",  # userinfo
+        "did:web:127.0.0.1%3A80@example.com",  # userinfo hiding a loopback target
+        "did:web:example.com?x",  # query
+        "did:web:evil.com#frag",  # fragment
+        "did:web:",  # empty host
+    ]:
+        try:
+            did_web_url(bad)
+            assert False, f"not rejected: {bad!r}"
+        except ResolutionError:
+            pass
+
+
 if __name__ == "__main__":
     test_blocked_encodings()
     test_public_hosts_allowed()
     test_path_traversal_rejected()
+    test_did_web_url_decodes_a_port_and_rejects_hosts_that_are_not_plain_host_port()
     print("SSRF regression tests passed")

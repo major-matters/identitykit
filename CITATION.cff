@@ -2,6 +2,9 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "IdentityKit"
 type: software
+# npm identitykit 0.0.4; PyPI identitykit 0.0.3 (the two packages are versioned separately)
+version: "0.0.4"
+date-released: "2026-10-31"
 authors:
   - name: "Major Labs"
     website: "https://majorlabs.co"
