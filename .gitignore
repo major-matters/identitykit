@@ -13,3 +13,5 @@ typescript/dist/
 
 # OS
 .DS_Store
+typescript.log
+typescript.url
